@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Transcity",
+  "description": "Premium shuttle app for Bali travel and logistics.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

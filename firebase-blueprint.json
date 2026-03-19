@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string" },
+        "profilePic": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A booking made by a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "route": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "seats": { "type": "number" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Completed", "Cancelled"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "customerName", "phone", "route", "date", "time", "seats", "totalPrice", "status"]
+    },
+    "Destination": {
+      "title": "Destination",
+      "description": "A travel destination",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" }
+      },
+      "required": ["name", "category", "imageUrl", "lat", "lng"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "A banner displayed on the home page",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video"] }
+      },
+      "required": ["url", "type"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "App settings like QRIS",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "User bookings"
+    },
+    "/destinations/{destinationId}": {
+      "schema": { "$ref": "#/entities/Destination" },
+      "description": "Available destinations"
+    },
+    "/banners/{bannerId}": {
+      "schema": { "$ref": "#/entities/Banner" },
+      "description": "Home page banners"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "App settings"
+    }
+  }
+}
