@@ -56,7 +56,7 @@ export interface Destination {
   lat: number;
   lng: number;
   imageUrl: string;
-  category: 'Culture' | 'Nature' | 'Nightlife' | 'Beach';
+  category: 'Culture' | 'Nature' | 'Nightlife' | 'Beach' | 'Promo';
 }
 
 export interface ItineraryItem {

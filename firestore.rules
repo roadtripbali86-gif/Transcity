@@ -70,8 +70,8 @@ service cloud.firestore {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.lat is number &&
              data.lng is number &&
-             data.imageUrl is string && data.imageUrl.size() > 0 && data.imageUrl.size() < 1048576 &&
-             data.category in ['Culture', 'Nature', 'Nightlife', 'Beach'];
+             data.imageUrl is string && data.imageUrl.size() >= 0 && data.imageUrl.size() < 1048576 &&
+             data.category in ['Culture', 'Nature', 'Nightlife', 'Beach', 'Promo'];
     }
 
     function isValidBanners(data) {

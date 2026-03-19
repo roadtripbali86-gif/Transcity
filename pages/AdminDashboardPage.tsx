@@ -6,7 +6,7 @@ import { useCustomBanners } from '../hooks/useCustomBanners';
 import { useCustomQRIS } from '../hooks/useCustomQRIS';
 import { compressImage } from '../utils/imageUtils';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth } from '../firebase';
 
 enum OperationType {
@@ -150,6 +150,29 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
     setShowQRISModal(false);
   };
 
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus data penumpang ini?')) {
+      try {
+        await deleteDoc(doc(db, 'bookings', bookingId));
+      } catch (e) {
+        handleFirestoreError(e, OperationType.DELETE, `bookings/${bookingId}`);
+      }
+    }
+  };
+
+  const handleEmptyDestinations = async () => {
+    if (window.confirm('Apakah Anda yakin ingin mengosongkan 4 gambar destinasi untuk promosi?')) {
+      for (const dest of BALI_DESTINATIONS) {
+        try {
+          await setDoc(doc(db, 'destinations', dest.id), dest);
+        } catch (e) {
+          handleFirestoreError(e, OperationType.UPDATE, `destinations/${dest.id}`);
+        }
+      }
+      alert('Gambar destinasi berhasil dikosongkan.');
+    }
+  };
+
   if (!currentUser || currentUser.role !== 'admin') {
     return (
       <div className="p-10 text-center">
@@ -202,12 +225,21 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
                       <p className="text-xs font-black text-slate-800">{b.customerName}</p>
                       <p className="text-[10px] text-slate-500 font-bold">{b.phone || '-'}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${
-                      b.status === 'Confirmed' ? 'bg-green-100 text-green-700' : 
-                      b.status === 'Completed' ? 'bg-[#1877F2]/10 text-[#1877F2]' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {b.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest ${
+                        b.status === 'Confirmed' ? 'bg-green-100 text-green-700' : 
+                        b.status === 'Completed' ? 'bg-[#1877F2]/10 text-[#1877F2]' : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {b.status}
+                      </span>
+                      <button 
+                        onClick={() => handleDeleteBooking(b.id)}
+                        className="w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
+                        title="Hapus Data"
+                      >
+                        <i className="fa-solid fa-trash-can text-[10px]"></i>
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl">
                     <div>
@@ -257,7 +289,15 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
 
             <div className="h-px bg-slate-200 my-6"></div>
 
-            <p className="text-[10px] text-slate-500 font-bold mb-4">Edit gambar destinasi yang ditampilkan di halaman utama.</p>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] text-slate-500 font-bold">Edit gambar destinasi yang ditampilkan di halaman utama.</p>
+              <button 
+                onClick={handleEmptyDestinations}
+                className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors"
+              >
+                Kosongkan Gambar
+              </button>
+            </div>
             {destinations.map((dest) => (
               <div key={dest.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex gap-4 items-center">
                 <img src={dest.imageUrl} alt={dest.name} className="w-16 h-16 rounded-xl object-cover bg-slate-100" />

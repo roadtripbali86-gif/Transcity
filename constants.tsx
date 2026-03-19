@@ -57,10 +57,10 @@ export const MOCK_BOOKINGS = [
 ];
 
 export const BALI_DESTINATIONS: Destination[] = [
-  { id: '1', name: 'Tanah Lot', lat: -8.6212, lng: 115.0868, imageUrl: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&q=80&w=800', category: 'Culture' },
-  { id: '2', name: 'Pura Uluwatu', lat: -8.8291, lng: 115.0849, imageUrl: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?auto=format&fit=crop&q=80&w=800', category: 'Culture' },
-  { id: '3', name: 'Tegallalang Rice Terrace', lat: -8.4354, lng: 115.279, imageUrl: 'https://images.unsplash.com/photo-1555400038-63f5ba517a47?auto=format&fit=crop&q=80&w=800', category: 'Nature' },
-  { id: '4', name: 'Pantai Kuta', lat: -8.7175, lng: 115.1747, imageUrl: 'https://images.unsplash.com/photo-1570191911709-66c30f402c98?auto=format&fit=crop&q=80&w=800', category: 'Beach' },
+  { id: '1', name: 'Promo 1', lat: -8.6212, lng: 115.0868, imageUrl: '', category: 'Promo' },
+  { id: '2', name: 'Promo 2', lat: -8.8291, lng: 115.0849, imageUrl: '', category: 'Promo' },
+  { id: '3', name: 'Promo 3', lat: -8.4354, lng: 115.279, imageUrl: '', category: 'Promo' },
+  { id: '4', name: 'Promo 4', lat: -8.7175, lng: 115.1747, imageUrl: '', category: 'Promo' },
 ];
 
 export const MOCK_STATS_DATA = [

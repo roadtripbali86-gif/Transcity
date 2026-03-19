@@ -391,6 +391,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, user }) => {
         <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up flex flex-col">
             <div className="bg-blue-700 p-8 text-center relative overflow-hidden shrink-0">
+               <button onClick={() => setShowAccountInfo(false)} className="absolute top-4 right-4 z-20 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+                 <i className="fa-solid fa-xmark"></i>
+               </button>
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
                <h3 className="text-white font-black text-lg uppercase tracking-tight relative z-10">Pembayaran</h3>
                <p className="text-blue-100 text-[10px] font-bold uppercase mt-1 tracking-widest">QRIS Nasional</p>
@@ -443,6 +446,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, user }) => {
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]">
             <div className="bg-blue-700 p-8 text-center relative overflow-hidden shrink-0">
+               <button onClick={() => setShowTerms(false)} className="absolute top-4 right-4 z-20 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+                 <i className="fa-solid fa-xmark"></i>
+               </button>
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
                <h3 className="text-white font-black text-lg uppercase tracking-tight relative z-10">Ketentuan Layanan</h3>
             </div>
@@ -480,6 +486,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, user }) => {
         <div className="fixed inset-0 z-[1050] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]">
             <div className="bg-blue-700 p-8 text-center relative overflow-hidden shrink-0">
+               <button onClick={() => setShowPaymentTerms(false)} className="absolute top-4 right-4 z-20 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+                 <i className="fa-solid fa-xmark"></i>
+               </button>
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
                <h3 className="text-white font-black text-sm uppercase tracking-[0.2em] relative z-10 leading-snug">Ketentuan Pembayaran</h3>
                <p className="text-blue-100 text-[9px] font-bold mt-1 uppercase">Transcity Bali Tour & Travel</p>

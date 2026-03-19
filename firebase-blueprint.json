@@ -44,7 +44,7 @@
         "lat": { "type": "number" },
         "lng": { "type": "number" },
         "imageUrl": { "type": "string" },
-        "category": { "type": "string", "enum": ["Culture", "Nature", "Nightlife", "Beach"] }
+        "category": { "type": "string", "enum": ["Culture", "Nature", "Nightlife", "Beach", "Promo"] }
       },
       "required": ["name", "lat", "lng", "imageUrl", "category"]
     },
