@@ -3,175 +3,117 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Document ID: {userId}
-    // Fields:
-    //   - name: string (required)
-    //   - email: string (required)
-    //   - phone: string (optional)
-    //   - role: string (required, 'user' or 'admin')
-    //   - createdAt: string (optional)
-    //   - profilePic: string (optional)
-    //
-    // Collection: bookings
-    // Document ID: {bookingId}
-    // Fields:
-    //   - userId: string (required)
-    //   - customerName: string (required)
-    //   - phone: string (required)
-    //   - route: string (required)
-    //   - date: string (required)
-    //   - time: string (required)
-    //   - seats: number (required)
-    //   - totalPrice: number (required)
-    //   - status: string (required, 'Pending', 'Confirmed', 'Completed', 'Cancelled')
-    //   - createdAt: string (optional)
-    //
-    // Collection: destinations
-    // Document ID: {destinationId}
-    // Fields:
-    //   - name: string (required)
-    //   - category: string (required)
-    //   - imageUrl: string (required)
-    //   - lat: number (required)
-    //   - lng: number (required)
-    //
-    // Collection: banners
-    // Document ID: {bannerId}
-    // Fields:
-    //   - url: string (required)
-    //   - type: string (required, 'image' or 'video')
-    //
-    // Collection: settings
-    // Document ID: {settingId}
-    // Fields:
-    //   - imageUrl: string (optional)
-    //
-    // ===============================================================
-
-    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "roadtripbali86@gmail.com" ||
+        request.auth.token.email == "trancitybali@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.token.email == "roadtripbali86@gmail.com" && request.auth.token.email_verified == true) ||
-        (request.auth.token.email == "trancitybali@gmail.com" && request.auth.token.email_verified == true)
-      );
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.token.email == resource.data.userId;
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
     }
 
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
     }
 
     // ===============================================================
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['name', 'email', 'phone', 'role', 'createdAt', 'profilePic']) &&
+      return data.email is string && isValidEmail(data.email) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.email is string && isValidEmail(data.email) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
-             data.role in ['user', 'admin'] &&
-             (!('createdAt' in data) || data.createdAt is string) &&
-             (!('profilePic' in data) || data.profilePic is string);
+             (!("phone" in data) || (data.phone is string && data.phone.size() < 20)) &&
+             data.role in ['admin', 'user'] &&
+             (!("profilePic" in data) || (data.profilePic is string && data.profilePic.size() < 1048576)) && // 1MB limit
+             data.createdAt is string && isValidDateString(data.createdAt);
     }
 
     function isValidBooking(data) {
-      return hasOnlyAllowedFields(['userId', 'customerName', 'phone', 'route', 'date', 'time', 'seats', 'totalPrice', 'status', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 &&
+      return data.userId is string && isValidEmail(data.userId) &&
              data.customerName is string && data.customerName.size() > 0 && data.customerName.size() < 100 &&
-             data.phone is string && data.phone.size() < 20 &&
-             data.route is string && data.route.size() < 100 &&
-             data.date is string && data.date.size() < 20 &&
-             data.time is string && data.time.size() < 20 &&
+             data.route is string && data.route.size() > 0 && data.route.size() < 100 &&
+             data.date is string && data.date.size() > 0 && data.date.size() < 20 &&
+             data.time is string && data.time.size() > 0 && data.time.size() < 20 &&
              data.seats is number && data.seats > 0 && data.seats <= 10 &&
+             (!("seatNumbers" in data) || (data.seatNumbers is list && data.seatNumbers.size() <= 10)) &&
              data.totalPrice is number && data.totalPrice >= 0 &&
-             data.status in ['Pending', 'Confirmed', 'Completed', 'Cancelled'] &&
-             (!('createdAt' in data) || data.createdAt is string);
+             data.status in ['Confirmed', 'Pending', 'Completed'] &&
+             (!("pickup" in data) || (data.pickup is string && data.pickup.size() < 200)) &&
+             (!("dropoff" in data) || (data.dropoff is string && data.dropoff.size() < 200)) &&
+             (!("phone" in data) || (data.phone is string && data.phone.size() < 20)) &&
+             (!("createdAt" in data) || (data.createdAt is string && isValidDateString(data.createdAt)));
     }
 
     function isValidDestination(data) {
-      return hasOnlyAllowedFields(['name', 'category', 'imageUrl', 'lat', 'lng']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
-             isValidUrl(data.imageUrl) &&
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.lat is number &&
-             data.lng is number;
+             data.lng is number &&
+             data.imageUrl is string && data.imageUrl.size() > 0 && data.imageUrl.size() < 1048576 &&
+             data.category in ['Culture', 'Nature', 'Nightlife', 'Beach'];
     }
 
-    function isValidBanner(data) {
-      return hasOnlyAllowedFields(['url', 'type']) &&
-             isValidUrl(data.url) &&
-             data.type in ['image', 'video'];
+    function isValidBanners(data) {
+      return data.banners is list && data.banners.size() <= 10;
     }
 
-    function isValidSetting(data) {
-      return hasOnlyAllowedFields(['imageUrl']) &&
-             (!('imageUrl' in data) || isValidUrl(data.imageUrl));
+    function isValidQRIS(data) {
+      return data.imageUrl is string && data.imageUrl.size() > 0 && data.imageUrl.size() < 1048576;
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (isOwner(userId) && request.resource.data.role == 'user') || isAdmin()
-      );
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()
-      );
+      allow create: if isAuthenticated() && isOwner(userId) && hasRequiredFields(['email', 'name', 'role', 'createdAt']) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
       allow delete: if isAdmin();
     }
 
     match /bookings/{bookingId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAuthenticated() && isValidBooking(request.resource.data) && (
-        request.auth.uid == request.resource.data.userId || isAdmin()
-      );
-      allow update: if isAuthenticated() && isValidBooking(request.resource.data) && (
-        (request.auth.uid == resource.data.userId && request.resource.data.userId == resource.data.userId) || isAdmin()
-      );
-      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow read: if isAuthenticated() && (request.auth.token.email == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.token.email == request.resource.data.userId && hasRequiredFields(['userId', 'customerName', 'route', 'date', 'time', 'seats', 'totalPrice', 'status']) && isValidBooking(request.resource.data);
+      allow update: if isAdmin() && isValidBooking(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.userId);
     }
 
     match /destinations/{destinationId} {
-      allow read: if true;
-      allow create: if isAdmin() && isValidDestination(request.resource.data);
-      allow update: if isAdmin() && isValidDestination(request.resource.data);
+      allow read: if true; // Publicly readable
+      allow create, update, delete: if isAdmin() && isValidDestination(request.resource.data);
+    }
+
+    match /settings/banners {
+      allow read: if true; // Publicly readable
+      allow create, update: if isAdmin() && hasRequiredFields(['banners']) && isValidBanners(request.resource.data);
       allow delete: if isAdmin();
     }
 
-    match /banners/{bannerId} {
-      allow read: if true;
-      allow create: if isAdmin() && isValidBanner(request.resource.data);
-      allow update: if isAdmin() && isValidBanner(request.resource.data);
-      allow delete: if isAdmin();
-    }
-    match /settings/{settingId} {
-      allow read: if true;
-      allow create: if isAdmin() && isValidSetting(request.resource.data);
-      allow update: if isAdmin() && isValidSetting(request.resource.data);
+    match /settings/qris {
+      allow read: if true; // Publicly readable
+      allow create, update: if isAdmin() && hasRequiredFields(['imageUrl']) && isValidQRIS(request.resource.data);
       allow delete: if isAdmin();
     }
   }

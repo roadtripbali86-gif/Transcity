@@ -17,8 +17,59 @@ import InstallSystem from './components/InstallSystem';
 import SplashScreen from './components/SplashScreen';
 import { MOCK_BOOKINGS } from './constants';
 import { auth, db } from './firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDoc, getDocFromServer } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -27,14 +78,29 @@ const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Fetch user role from Firestore
         let role: 'admin' | 'user' = 'user';
+        let profilePic = '';
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             role = userDoc.data().role || 'user';
+            profilePic = userDoc.data().profilePic || '';
           } else {
             // Check if default admin
             if (user.email === 'roadtripbali86@gmail.com' || user.email === 'trancitybali@gmail.com') {
@@ -55,7 +121,7 @@ const App: React.FC = () => {
             }
           }
         } catch (e) {
-          console.error("Error fetching user role", e);
+          handleFirestoreError(e, OperationType.GET, `users/${user.uid}`);
         }
 
         setCurrentUser({
@@ -63,6 +129,7 @@ const App: React.FC = () => {
           name: user.displayName || user.email?.split('@')[0] || 'User',
           phone: user.phoneNumber || '',
           role: role,
+          profilePic: profilePic,
           isLoggedIn: true
         });
         
@@ -102,7 +169,7 @@ const App: React.FC = () => {
       });
       setBookings(b);
     }, (error) => {
-      console.error("Failed to fetch bookings", error);
+      handleFirestoreError(error, OperationType.LIST, 'bookings');
     });
 
     return () => unsubscribe();
@@ -154,8 +221,7 @@ const App: React.FC = () => {
     try {
       await setDoc(doc(db, 'bookings', bookingId), bookingWithId);
     } catch (e) {
-      console.error("Failed to add booking", e);
-      alert("Gagal menambahkan booking.");
+      handleFirestoreError(e, OperationType.CREATE, `bookings/${bookingId}`);
     }
   };
 
@@ -163,12 +229,11 @@ const App: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'bookings', id));
     } catch (e) {
-      console.error("Failed to delete booking", e);
-      alert("Gagal menghapus booking.");
+      handleFirestoreError(e, OperationType.DELETE, `bookings/${id}`);
     }
   };
 
-  const handleUpdateUser = async (updatedData: { name: string; phone: string }) => {
+  const handleUpdateUser = async (updatedData: { name: string; phone: string; profilePic?: string }) => {
     if (!currentUser) return;
     try {
       const userRef = doc(db, 'users', auth.currentUser!.uid);
@@ -176,8 +241,7 @@ const App: React.FC = () => {
       const newUser = { ...currentUser, ...updatedData };
       setCurrentUser(newUser);
     } catch (e) {
-      console.error("Failed to update user", e);
-      alert("Gagal memperbarui profil.");
+      handleFirestoreError(e, OperationType.UPDATE, `users/${auth.currentUser!.uid}`);
     }
   };
 

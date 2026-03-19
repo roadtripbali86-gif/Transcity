@@ -3,8 +3,62 @@ import { AppRoute, User, Booking, Destination } from '../types';
 import { BALI_DESTINATIONS } from '../constants';
 import BannerSettingsModal from '../components/BannerSettingsModal';
 import { useCustomBanners } from '../hooks/useCustomBanners';
+import { useCustomQRIS } from '../hooks/useCustomQRIS';
+import { compressImage } from '../utils/imageUtils';
 import { db } from '../firebase';
-import { collection, doc, setDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface AdminDashboardPageProps {
   currentUser: User | null;
@@ -14,34 +68,31 @@ interface AdminDashboardPageProps {
 const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'laporan' | 'gambar'>('laporan');
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [destinations, setDestinations] = useState<Destination[]>(BALI_DESTINATIONS);
   
   const [editingDest, setEditingDest] = useState<Destination | null>(null);
   const [editImageUrl, setEditImageUrl] = useState('');
   const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showQRISModal, setShowQRISModal] = useState(false);
+  const [qrisImageUrl, setQrisImageUrl] = useState('');
 
   const { banners, saveBanners } = useCustomBanners();
+  const { customQRIS, saveQRIS } = useCustomQRIS();
 
   useEffect(() => {
-    // Load bookings
-    const q = query(collection(db, 'bookings'));
-    const unsubscribeBookings = onSnapshot(q, (snapshot) => {
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       const b: Booking[] = [];
       snapshot.forEach((doc) => {
         b.push({ id: doc.id, ...doc.data() } as Booking);
       });
-      // Sort client-side
       b.sort((x, y) => {
         const dateX = x.createdAt ? new Date(x.createdAt).getTime() : 0;
         const dateY = y.createdAt ? new Date(y.createdAt).getTime() : 0;
         return dateY - dateX;
       });
       setBookings(b);
-    }, (error) => {
-      console.error("Failed to fetch bookings", error);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'bookings'));
 
-    // Load destinations
     const unsubscribeDestinations = onSnapshot(collection(db, 'destinations'), (snapshot) => {
       if (!snapshot.empty) {
         const d: Destination[] = [];
@@ -50,19 +101,16 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
         });
         setDestinations(d);
       } else {
-        // Initialize with default destinations if empty
-        setDestinations(BALI_DESTINATIONS);
+        // Initialize if empty
         BALI_DESTINATIONS.forEach(async (dest) => {
           try {
             await setDoc(doc(db, 'destinations', dest.id), dest);
           } catch (e) {
-            console.error("Failed to initialize destination", e);
+            handleFirestoreError(e, OperationType.CREATE, `destinations/${dest.id}`);
           }
         });
       }
-    }, (error) => {
-      console.error("Failed to fetch destinations", error);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'destinations'));
 
     return () => {
       unsubscribeBookings();
@@ -76,12 +124,30 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
       await setDoc(doc(db, 'destinations', editingDest.id), {
         ...editingDest,
         imageUrl: editImageUrl
-      });
+      }, { merge: true });
       setEditingDest(null);
     } catch (e) {
-      console.error("Failed to update destination", e);
-      alert("Gagal menyimpan gambar destinasi.");
+      handleFirestoreError(e, OperationType.UPDATE, `destinations/${editingDest.id}`);
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, setUrl: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const base64Url = await compressImage(file, 800, 800, 0.7);
+      setUrl(base64Url);
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      alert("Gagal mengunggah gambar. Pastikan format gambar didukung.");
+    }
+  };
+
+  const handleSaveQRIS = async () => {
+    if (qrisImageUrl) {
+      await saveQRIS(qrisImageUrl);
+    }
+    setShowQRISModal(false);
   };
 
   if (!currentUser || currentUser.role !== 'admin') {
@@ -169,13 +235,25 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
 
         {activeTab === 'gambar' && (
           <div className="space-y-4">
-            <button 
-              onClick={() => setShowBannerModal(true)}
-              className="w-full bg-[#1877F2] text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-[#1877F2]/30 flex items-center justify-center gap-3 hover:bg-blue-700 transition-colors"
-            >
-              <i className="fa-solid fa-images"></i>
-              Kelola Banner Beranda
-            </button>
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => setShowBannerModal(true)}
+                className="w-full bg-[#1877F2] text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-[#1877F2]/30 flex flex-col items-center justify-center gap-2 hover:bg-blue-700 transition-colors"
+              >
+                <i className="fa-solid fa-images text-lg"></i>
+                Kelola Banner
+              </button>
+              <button 
+                onClick={() => {
+                  setQrisImageUrl(customQRIS || '');
+                  setShowQRISModal(true);
+                }}
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/30 flex flex-col items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"
+              >
+                <i className="fa-solid fa-qrcode text-lg"></i>
+                Kelola QRIS
+              </button>
+            </div>
 
             <div className="h-px bg-slate-200 my-6"></div>
 
@@ -212,11 +290,16 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
             </div>
             
             <div className="space-y-4">
-              <div className="w-full aspect-video rounded-xl bg-slate-100 overflow-hidden">
+              <div className="w-full aspect-video rounded-xl bg-slate-100 overflow-hidden relative group">
                 <img src={editImageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL')} />
+                <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <i className="fa-solid fa-upload text-2xl mb-2"></i>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Upload Foto</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setEditImageUrl)} />
+                </label>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">URL Gambar Baru</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Atau URL Gambar Baru</label>
                 <input 
                   type="text" 
                   value={editImageUrl}
@@ -252,6 +335,54 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ currentUser, on
           onClose={() => setShowBannerModal(false)} 
           onSave={saveBanners} 
         />
+      )}
+
+      {/* QRIS Settings Modal */}
+      {showQRISModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-5">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 space-y-6">
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Kelola QRIS</h3>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Upload Foto QRIS Baru</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="w-full aspect-square rounded-xl bg-slate-100 overflow-hidden relative group border-2 border-dashed border-slate-300">
+                {qrisImageUrl ? (
+                  <>
+                    <img src={qrisImageUrl} alt="QRIS Preview" className="w-full h-full object-contain p-2" />
+                    <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                      <i className="fa-solid fa-upload text-2xl mb-2"></i>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Ganti Foto</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setQrisImageUrl)} />
+                    </label>
+                  </>
+                ) : (
+                  <label className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-200 transition-colors">
+                    <i className="fa-solid fa-upload text-3xl mb-2"></i>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Upload QRIS</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setQrisImageUrl)} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowQRISModal(false)}
+                className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleSaveQRIS}
+                className="flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/30"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

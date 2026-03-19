@@ -28,10 +28,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigate }) => {
     
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setIsLoading(false);
+      // onAuthStateChanged in App.tsx will handle the navigation
     } catch (err: any) {
-      console.error(err);
-      setError('Email atau password salah.');
+      setError('Email atau password salah. Silakan coba lagi.');
       setIsLoading(false);
     }
   };
@@ -39,13 +38,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigate }) => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError(null);
+    const provider = new GoogleAuthProvider();
     try {
-      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      setIsLoading(false);
+      // onAuthStateChanged in App.tsx will handle the navigation
     } catch (err: any) {
-      console.error(err);
-      setError('Gagal login dengan Google. Silakan coba lagi.');
+      setError('Gagal login dengan Google.');
       setIsLoading(false);
     }
   };
@@ -158,7 +156,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigate }) => {
               disabled={isLoading}
               className="w-full bg-white/5 text-white font-black py-4 rounded-2xl shadow-sm transform transition-all active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-4 tracking-widest text-[10px] uppercase border border-white/10 hover:bg-white/10"
             >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" className="w-5 h-5" />
               <span>Google</span>
             </button>
           </form>

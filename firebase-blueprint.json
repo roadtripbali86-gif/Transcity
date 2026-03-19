@@ -5,32 +5,35 @@
       "description": "User profile information",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
         "phone": { "type": "string" },
-        "role": { "type": "string", "enum": ["user", "admin"] },
-        "createdAt": { "type": "string" },
-        "profilePic": { "type": "string" }
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "profilePic": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "email", "role"]
+      "required": ["email", "name", "role", "createdAt"]
     },
     "Booking": {
       "title": "Booking",
       "description": "A booking made by a user",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
+        "userId": { "type": "string", "format": "email" },
         "customerName": { "type": "string" },
-        "phone": { "type": "string" },
         "route": { "type": "string" },
         "date": { "type": "string" },
         "time": { "type": "string" },
         "seats": { "type": "number" },
+        "seatNumbers": { "type": "array", "items": { "type": "number" } },
         "totalPrice": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Completed", "Cancelled"] },
-        "createdAt": { "type": "string" }
+        "status": { "type": "string", "enum": ["Confirmed", "Pending", "Completed"] },
+        "pickup": { "type": "string" },
+        "dropoff": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "customerName", "phone", "route", "date", "time", "seats", "totalPrice", "status"]
+      "required": ["userId", "customerName", "route", "date", "time", "seats", "totalPrice", "status"]
     },
     "Destination": {
       "title": "Destination",
@@ -38,52 +41,63 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "category": { "type": "string" },
-        "imageUrl": { "type": "string" },
         "lat": { "type": "number" },
-        "lng": { "type": "number" }
+        "lng": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string", "enum": ["Culture", "Nature", "Nightlife", "Beach"] }
       },
-      "required": ["name", "category", "imageUrl", "lat", "lng"]
+      "required": ["name", "lat", "lng", "imageUrl", "category"]
     },
-    "Banner": {
-      "title": "Banner",
-      "description": "A banner displayed on the home page",
+    "Banners": {
+      "title": "Banners",
+      "description": "Banner settings",
       "type": "object",
       "properties": {
-        "url": { "type": "string" },
-        "type": { "type": "string", "enum": ["image", "video"] }
+        "banners": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string", "enum": ["video", "image"] }
+            },
+            "required": ["id", "url", "type"]
+          }
+        }
       },
-      "required": ["url", "type"]
+      "required": ["banners"]
     },
-    "Setting": {
-      "title": "Setting",
-      "description": "App settings like QRIS",
+    "QRIS": {
+      "title": "QRIS",
+      "description": "QRIS settings",
       "type": "object",
       "properties": {
         "imageUrl": { "type": "string" }
-      }
+      },
+      "required": ["imageUrl"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
+    "users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
     },
-    "/bookings/{bookingId}": {
+    "bookings/{bookingId}": {
       "schema": { "$ref": "#/entities/Booking" },
       "description": "User bookings"
     },
-    "/destinations/{destinationId}": {
+    "destinations/{destinationId}": {
       "schema": { "$ref": "#/entities/Destination" },
-      "description": "Available destinations"
+      "description": "Travel destinations"
     },
-    "/banners/{bannerId}": {
-      "schema": { "$ref": "#/entities/Banner" },
-      "description": "Home page banners"
+    "settings/banners": {
+      "schema": { "$ref": "#/entities/Banners" },
+      "description": "Banner settings"
     },
-    "/settings/{settingId}": {
-      "schema": { "$ref": "#/entities/Setting" },
-      "description": "App settings"
+    "settings/qris": {
+      "schema": { "$ref": "#/entities/QRIS" },
+      "description": "QRIS settings"
     }
   }
 }

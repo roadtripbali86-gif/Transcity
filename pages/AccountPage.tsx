@@ -1,14 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AppRoute, User } from '../types';
-import { db, auth } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AccountPageProps {
   onNavigate: (route: AppRoute) => void;
   user: User | null;
   onLogout: () => void;
-  onUpdateUser?: (updatedData: { name: string; phone: string }) => void;
+  onUpdateUser?: (updatedData: { name: string; phone: string; profilePic?: string }) => void;
 }
 
 const AccountPage: React.FC<AccountPageProps> = ({ onNavigate, user, onLogout, onUpdateUser }) => {
@@ -24,40 +22,23 @@ const AccountPage: React.FC<AccountPageProps> = ({ onNavigate, user, onLogout, o
       setEditName(user.name);
       setEditPhone(user.phone || '');
       
-      // Fetch profile pic from Firestore
-      const fetchProfilePic = async () => {
-        if (auth.currentUser) {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-            if (userDoc.exists() && userDoc.data().profilePic) {
-              setProfilePic(userDoc.data().profilePic);
-            }
-          } catch (e) {
-            console.error("Failed to fetch profile picture", e);
-          }
-        }
-      };
-      fetchProfilePic();
+      if (user.profilePic) {
+        setProfilePic(user.profilePic);
+      }
     }
   }, [user]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && user && auth.currentUser) {
+    if (file && user) {
       setIsUploading(true);
       const reader = new FileReader();
-      reader.onloadend = async () => {
+      reader.onloadend = () => {
         const base64String = reader.result as string;
         setProfilePic(base64String);
-        
-        try {
-          await setDoc(doc(db, 'users', auth.currentUser!.uid), {
-            profilePic: base64String
-          }, { merge: true });
-        } catch (error) {
-          console.error("Failed to save profile picture", error);
+        if (onUpdateUser) {
+          onUpdateUser({ name: user.name, phone: user.phone || '', profilePic: base64String });
         }
-        
         setIsUploading(false);
       };
       reader.readAsDataURL(file);

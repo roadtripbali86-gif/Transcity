@@ -16,13 +16,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNavigate }) =
   const handleGoogleRegister = async () => {
     setIsLoading(true);
     setErrorMsg('');
+    const provider = new GoogleAuthProvider();
     try {
-      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      setIsLoading(false);
-    } catch (error: any) {
-      console.error("Google Sign-In Error:", error);
-      setErrorMsg(error.message || 'Terjadi kesalahan saat mendaftar dengan Google.');
+      // onAuthStateChanged in App.tsx will handle the navigation
+    } catch (err: any) {
+      setErrorMsg('Gagal mendaftar dengan Google.');
       setIsLoading(false);
     }
   };
@@ -56,7 +55,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onRegister, onNavigate }) =
             ) : (
               <>
                 <div className="bg-white p-1 rounded-full">
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" className="w-4 h-4" />
                 </div>
                 <span>DAFTAR DENGAN GOOGLE</span>
               </>

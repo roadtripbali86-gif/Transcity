@@ -1,6 +1,58 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, setDoc, getDocs, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export interface CustomBanner {
   id: string;
@@ -14,23 +66,16 @@ export const useCustomBanners = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'banners'), (snapshot) => {
-      const newBanners: (CustomBanner | null)[] = Array(7).fill(null);
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        const index = parseInt(doc.id, 10);
-        if (!isNaN(index) && index >= 0 && index < 7) {
-          newBanners[index] = {
-            id: doc.id,
-            url: data.url,
-            type: data.type
-          };
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'banners'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.banners) {
+          setBanners(data.banners);
         }
-      });
-      setBanners(newBanners);
+      }
       setIsLoading(false);
     }, (error) => {
-      console.error("Failed to fetch banners", error);
+      handleFirestoreError(error, OperationType.GET, 'settings/banners');
       setIsLoading(false);
     });
 
@@ -39,37 +84,30 @@ export const useCustomBanners = () => {
 
   const saveBanners = async (newBanners: (CustomBanner | null)[]) => {
     try {
-      for (let i = 0; i < newBanners.length; i++) {
-        const banner = newBanners[i];
-        if (!banner) {
-          try {
-            await deleteDoc(doc(db, 'banners', i.toString()));
-          } catch (e) {
-            // Ignore if document doesn't exist
+      const processedBanners = await Promise.all(
+        newBanners.map(async (banner) => {
+          if (!banner) return null;
+          if (banner.file) {
+            return new Promise<CustomBanner>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                resolve({
+                  id: banner.id,
+                  type: banner.type,
+                  url: reader.result as string
+                });
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(banner.file!);
+            });
           }
-          continue;
-        }
-        
-        let url = banner.url;
-        if (banner.file) {
-          // Convert file to base64 for Firestore
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(banner.file!);
-          });
-          url = base64;
-        }
-        
-        await setDoc(doc(db, 'banners', i.toString()), {
-          url: url,
-          type: banner.type
-        });
-      }
+          return banner;
+        })
+      );
+      
+      await setDoc(doc(db, 'settings', 'banners'), { banners: processedBanners }, { merge: true });
     } catch (err) {
-      console.error('Failed to save custom banners', err);
-      alert('Gagal menyimpan banner. Pastikan ukuran file tidak terlalu besar (maksimal 1MB).');
+      handleFirestoreError(err, OperationType.UPDATE, 'settings/banners');
     }
   };
 
